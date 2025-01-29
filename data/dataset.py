@@ -109,21 +109,21 @@ class Dataset:
     def __init__(self, root, name, seed=None, use_mettack=False, ptb_rate=0):
         self.name = name.lower()
 
-        assert self.name in [
-            "cora",
-            "citeseer",
-            "pubmed",
-            "ogbn-arxiv",
-            "cornell",
-            "wisconsin",
-            "texas",
-            "actor",
-            "polblogs"
-        ], (
-            "Currently only support cora, citeseer, pubmed, "
-            + "ogbn-arxiv, "
-            + "cornell, wisconsin, texas, actor"
-        )
+        # assert self.name in [
+        #     "cora",
+        #     "citeseer",
+        #     "pubmed",
+        #     "ogbn-arxiv",
+        #     "cornell",
+        #     "wisconsin",
+        #     "texas",
+        #     "actor",
+        #     "polblogs"
+        # ], (
+        #     "Currently only support cora, citeseer, pubmed, "
+        #     + "ogbn-arxiv, "
+        #     + "cornell, wisconsin, texas, actor"
+        # )
 
         self.seed = seed
 
@@ -234,14 +234,15 @@ class Dataset:
 
     def load_data(self):
         print("Loading {} dataset...".format(self.name))
-        if self.name in ['cora', 'citeseer', 'pubmed']:
-            return self.load_citation_dataset()
+        return None, None, None
+        # if self.name in ['cora', 'citeseer', 'pubmed']:
+        #     return self.load_citation_dataset()
 
-        if self.name in ['ogbn-arxiv']:
-            return self.load_ogb()
+        # if self.name in ['ogbn-arxiv']:
+        #     return self.load_ogb()
 
-        if self.name in ['cornell', 'wisconsin', 'texas', 'actor']:
-            return self.load_heterophilous()
+        # if self.name in ['cornell', 'wisconsin', 'texas', 'actor']:
+        #     return self.load_heterophilous()
 
     @property
     def num_feat(self):
@@ -295,7 +296,9 @@ class Dataset:
             )
 
     def load_citation_dataset(self):
-        url = "https://github.com/tkipf/gcn/tree/master/gcn/data/"
+        return None, None, None
+        # url = "https://github.com/tkipf/gcn/tree/master/gcn/data/"
+        url = "https://github.com/tkipf/gcn/raw/refs/heads/master/gcn/data/"
         names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
         objects = []
         for i in range(len(names)):
@@ -406,7 +409,7 @@ class Dataset:
         return adj, features, labels
 
     def load_heterophilous(self):
-        url = "https://github.com/yandex-research/heterophilous-graphs/tree/main/data/"
+        url = "https://github.com/yandex-research/heterophilous-graphs/raw/refs/heads/main/data/"
 
         name = f'{self.name}.npz'
         data_filename = osp.join(self.root, name)

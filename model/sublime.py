@@ -25,14 +25,31 @@ class SUBLIME(BaseModel):
         self.num_classes = num_classes
         self.device = device
 
-    def fit(self, dataset, split_num=0):
-        adj, features, labels = dataset.adj.copy(), dataset.features.clone(), dataset.labels
-        if dataset.name in ['cornell', 'texas', 'wisconsin', 'actor']:
+    def fit(self, dataset, split_num=0, knng=False, **knng_kwargs):
+        adj, features, labels = dataset.adj.clone().cpu(), dataset.features.clone(), dataset.labels
+        if knng:
+            from gnn.utils import get_knn_graph
+            n_edges = adj.sum().item()
+            adj = get_knn_graph(features, **knng_kwargs).to(adj.device)
+            print("Using knn graph")
+            print(f"Number of edges: {n_edges} -> {adj.sum().item()}")
+        # if dataset.name in ['cornell', 'texas', 'wisconsin', 'actor']:
+        #     train_mask = dataset.train_masks[split_num % 10]
+        #     val_mask = dataset.val_masks[split_num % 10]
+        #     test_mask = dataset.test_masks[split_num % 10]
+        # else:
+        #     train_mask, val_mask, test_mask = dataset.train_mask, dataset.val_mask, dataset.test_mask
+        
+        if hasattr(dataset, "train_masks"):
             train_mask = dataset.train_masks[split_num % 10]
             val_mask = dataset.val_masks[split_num % 10]
             test_mask = dataset.test_masks[split_num % 10]
-        else:
-            train_mask, val_mask, test_mask = dataset.train_mask, dataset.val_mask, dataset.test_mask
+            # dataset.train_mask, dataset.val_mask, dataset.test_mask = (
+            #     train_mask,
+            #     val_mask,
+            #     test_mask,
+            # )
+            # import ipdb; ipdb.set_trace()
 
 
         if self.config.mode == 'structure_inference':
@@ -133,10 +150,11 @@ class SUBLIME(BaseModel):
                     best_val_result = val_result
                     self.Adj = anchor_adj
 
-                print(f'Epoch: {epoch: 02d}, '
-                      f'Loss: {loss:.4f}, '
-                      f'Valid: {100 * val_result:.2f}%, '
-                      f'Test: {100 * test_result:.2f}%')
+                if epoch % 20 == 0:
+                    print(f'Epoch: {epoch: 02d}, '
+                        f'Loss: {loss:.4f}, '
+                        f'Valid: {100 * val_result:.2f}%, '
+                        f'Test: {100 * test_result:.2f}%')
 
 
 

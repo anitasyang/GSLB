@@ -88,10 +88,10 @@ class LDS(BaseModel):
     """
 
     def __init__(
-        self, num_features, num_classes, metric, config_path, dataset_name, device, data
+        self, num_features, num_classes, metric, config_path, dataset_name, device, params=None
     ):
         super(LDS, self).__init__(
-            num_features, num_classes, metric, config_path, dataset_name, device
+            num_features, num_classes, metric, config_path, dataset_name, device, params
         )
 
         # inner_trainer里自己有一个gcn
@@ -125,18 +125,25 @@ class LDS(BaseModel):
         # self.norm_mode = "sym"
         # self.config = self.config
 
-    def fit(self, dataset=None, split_num=0):
+    def fit(self, dataset=None, split_num=0, knng=False, **knng_kwargs):
         adj, features, labels = (
             dataset.adj.clone(),
             dataset.features.clone(),
             dataset.labels,
-        )
+        )        
+        if knng:
+            from gnn.utils import get_knn_graph
+            n_edges = adj.sum().item()
+            adj = get_knn_graph(features, **knng_kwargs).to(adj.device)
+            print("Using knn graph")
+            print(f"Number of edges: {n_edges} -> {adj.sum().item()}")
         features = row_normalize_features(features)
 
         dataset.features = features
         dataset.adj = adj
 
-        if dataset.name in ["cornell", "texas", "wisconsin", "actor"]:
+        # if dataset.name in ["cornell", "texas", "wisconsin", "actor"]:
+        if hasattr(dataset, "train_masks"):
             train_mask = dataset.train_masks[split_num % 10]
             val_mask = dataset.val_masks[split_num % 10]
             test_mask = dataset.test_masks[split_num % 10]
@@ -289,7 +296,7 @@ class LDS(BaseModel):
 
         # 原作者早停的逻辑是val.loss小于patience个loss平均值时加入，是一个更鲁棒的算法，但和常规的update best result不一样，这里还是采用常规的update best result
         # 使用acc来取最好的一次，而不是loss
-
+        return evaluate_result['loss.val.final']
 
     def inner_opt_step(self):
         self.outer_trainer.train()

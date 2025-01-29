@@ -59,6 +59,10 @@ class NodeFormer(BaseModel):
             self.fcs.append(nn.Linear(self.hidden_dim * self.num_layers + self.hidden_dim, num_classes))
         else:
             self.fcs.append(nn.Linear(self.hidden_dim, num_classes))
+        
+        self.fcs.to(device)
+        self.convs.to(device)
+        self.bns.to(device)
 
     def reset_parameters(self):
         for conv in self.convs:
@@ -115,7 +119,7 @@ class NodeFormer(BaseModel):
         self.eval()
         with torch.no_grad():
             out, _ = self.feedforward(features, adjs, self.tau)
-            acc = self.metric(out[mask], labels[mask], self.num_class)
+            acc = self.metric(out[mask], labels[mask])  # , self.num_class
         return acc
     
     @staticmethod
@@ -132,14 +136,33 @@ class NodeFormer(BaseModel):
         self.bns.to(device)
         return self
     
-    def fit(self, dataset, split_num=0):
+    def fit(self, dataset, split_num=0, knng=False, **knng_kwargs):
         adj, features, labels = dataset.adj.clone(), dataset.features.clone(), dataset.labels
-        if dataset.name in ['cornell', 'texas', 'wisconsin', 'actor']:
+        
+        # import ipdb; ipdb.set_trace()
+        if knng:
+            from gnn.utils import get_knn_graph
+            n_edges = adj.sum().item()
+            adj = get_knn_graph(features, **knng_kwargs).to(adj.device)
+            print("Using knn graph")
+            print(f"Number of edges: {n_edges} -> {adj.sum().item()}")
+        
+        if hasattr(dataset, "train_masks"):
             train_mask = dataset.train_masks[split_num % 10]
             val_mask = dataset.val_masks[split_num % 10]
             test_mask = dataset.test_masks[split_num % 10]
-        else:
-            train_mask, val_mask, test_mask = dataset.train_mask, dataset.val_mask, dataset.test_mask
+            dataset.train_mask, dataset.val_mask, dataset.test_mask = (
+                train_mask,
+                val_mask,
+                test_mask,
+            )
+        # import ipdb; ipdb.set_trace()
+        # if dataset.name in ['cornell', 'texas', 'wisconsin', 'actor']:
+        #     train_mask = dataset.train_masks[split_num % 10]
+        #     val_mask = dataset.val_masks[split_num % 10]
+        #     test_mask = dataset.test_masks[split_num % 10]
+        # else:
+        #     train_mask, val_mask, test_mask = dataset.train_mask, dataset.val_mask, dataset.test_mask
 
 
         num_nodes = features.shape[0]
@@ -182,4 +205,7 @@ class NodeFormer(BaseModel):
                       f'Train: {100 * train_result:.2f}%, '
                       f'Valid: {100 * val_result:.2f}%, '
                       f'Test: {100 * test_result:.2f}%')
+        val_loss = criterion(out[val_mask], labels[val_mask])
+        
         self.best_result = best_test.item()
+        return val_loss.item()

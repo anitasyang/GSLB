@@ -66,13 +66,21 @@ class IDGL(BaseModel):
             torch.cuda.manual_seed(seed)
         self.is_test = False
 
-    def fit(self, dataset, split_num=0):
+    def fit(self, dataset, split_num=0, knng=False, **knng_kwargs):
         adj, features, labels = (
             dataset.adj.clone(),
             dataset.features.clone(),
             dataset.labels,
         )
-        if dataset.name in ["cornell", "texas", "wisconsin", "actor"]:
+        if knng:
+            from gnn.utils import get_knn_graph
+            n_edges = adj.sum().item()
+            adj = get_knn_graph(features, **knng_kwargs).to(adj.device)
+            print("Using knn graph")
+            print(f"Number of edges: {n_edges} -> {adj.sum().item()}")
+
+        # if dataset.name in ["cornell", "texas", "wisconsin", "actor"]:
+        if hasattr(dataset, "train_masks"):
             train_mask = dataset.train_masks[split_num % 10]
             val_mask = dataset.val_masks[split_num % 10]
             test_mask = dataset.test_masks[split_num % 10]
@@ -136,12 +144,13 @@ class IDGL(BaseModel):
             )
             cur_dev_score = self._dev_metrics[self.config["eary_stop_metric"]].mean()
 
-            print(
-                f"Epoch: {self._epoch: 02d}, "
-                f"Loss: {self._train_loss.mean():.4f}, "
-                f"Train: {100 * self._train_metrics['acc'].mean():.2f}%, "
-                f"Valid: {100 * self._dev_metrics['acc'].mean():.2f}%, "
-            )
+            if self._epoch % 20 == 0:
+                print(
+                    f"Epoch: {self._epoch: 02d}, "
+                    f"Loss: {self._train_loss.mean():.4f}, "
+                    f"Train: {100 * self._train_metrics['acc'].mean():.2f}%, "
+                    f"Valid: {100 * self._dev_metrics['acc'].mean():.2f}%, "
+                )
 
             if self._best_metrics[self.config["eary_stop_metric"]] < cur_dev_score:
                 self._best_epoch = self._epoch
@@ -154,6 +163,9 @@ class IDGL(BaseModel):
         # print(format_str)
         # self.logger.write_to_file(format_str)
         self.best_result = self.test(idx_test, hetero=False)["acc"].item()
+
+        val_loss = -self._dev_metrics['nloss'].mean()
+        return val_loss
 
     def test(self, idx_test, hetero=False):
         self.train_loader.update({"idx_test": idx_test})
@@ -546,6 +558,7 @@ class GraphClf(nn.Module):
                 dropout=self.dropout,
                 dropout_adj=0,
                 sparse=config.get("sparse", False),
+                device=device,
             )
 
         elif self.graph_module == "gat":
